@@ -152,8 +152,8 @@
             formData.append('file', file);
 
             try {
-                // ATENÇÃO: Quando publicar sua Edge Function, cole a URL real dela aqui
-                const URL_DO_SEU_BACKEND = 'https://sua-project-id.supabase.co/functions/v1/extrair-pecas';
+                // Aponta para a API do Vercel que criamos
+                const URL_DO_SEU_BACKEND = '/api/extrair-pecas';
 
                 const resposta = await fetch(URL_DO_SEU_BACKEND, {
                     method: 'POST',
