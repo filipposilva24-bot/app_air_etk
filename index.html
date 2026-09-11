@@ -140,37 +140,44 @@
             }
         }
 
-        // Função que simula o envio para o backend
-        function processarPDF(file) {
+        // Função de envio real para o backend
+        async function processarPDF(file) {
             // Esconde a área de upload e mostra o loader
             dropZone.style.display = 'none';
             loader.style.display = 'block';
             results.style.display = 'none';
 
-            // SIMULAÇÃO: Aqui vai entrar o código do Passo 2 (fetch para sua API)
-            // Vamos simular que a API demorou 3 segundos e devolveu este JSON estruturado:
-            setTimeout(() => {
-                const mockRespostaDaIA = [
-                    {
-                        "grupo": "Grupo 33 - Eixo Traseiro",
-                        "pecas": [
-                            { "qtd": "1", "nome": "Diferencial da roda traseira" },
-                            { "qtd": "1", "nome": "Kit de reparação da porca de embutir" },
-                            { "qtd": "2", "nome": "Anel de retenção do veio de saída" },
-                            { "qtd": "1,0 l", "nome": "Óleo aprovado para diferencial traseiro" }
-                        ]
-                    },
-                    {
-                        "grupo": "Grupo 18 - Sistema de Escape",
-                        "pecas": [
-                            { "qtd": "1", "nome": "Abraçadeira de fita ou V-Band" },
-                            { "qtd": "Div.", "nome": "Porcas de fixação do sistema de escape" }
-                        ]
-                    }
-                ];
+            // Prepara o arquivo para envio via formulário (FormData)
+            const formData = new FormData();
+            formData.append('file', file);
 
-                renderizarResultados(mockRespostaDaIA);
-            }, 3000); // Finge um atraso de 3s do processamento da IA
+            try {
+                // ATENÇÃO: Quando publicar sua Edge Function, cole a URL real dela aqui
+                const URL_DO_SEU_BACKEND = 'https://sua-project-id.supabase.co/functions/v1/extrair-pecas';
+
+                const resposta = await fetch(URL_DO_SEU_BACKEND, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!resposta.ok) {
+                    throw new Error(`Erro na comunicação com o servidor: ${resposta.status}`);
+                }
+
+                // Recebe o JSON real gerado pela IA através do seu backend
+                const dadosJSON = await resposta.json();
+                
+                // Manda o JSON para a função que desenha a tela
+                renderizarResultados(dadosJSON);
+
+            } catch (erro) {
+                console.error("Falha ao processar:", erro);
+                alert("Ocorreu um erro ao analisar o manual. Tente novamente ou verifique se o backend está rodando.");
+                
+                // Restaura a tela em caso de erro para permitir nova tentativa
+                dropZone.style.display = 'block';
+                loader.style.display = 'none';
+            }
         }
 
         // Função para construir o HTML a partir do JSON recebido
@@ -178,8 +185,10 @@
             loader.style.display = 'none';
             results.style.display = 'block';
             
+            // Limpa resultados anteriores caso existam
             results.innerHTML = '<h3>🔧 Checklist para o Catálogo (ETK)</h3>';
 
+            // Faz o loop pelos grupos do ETK devolvidos pela IA
             dados.forEach(grupoData => {
                 // Cria o título do Grupo
                 const tituloGrupo = document.createElement('div');
@@ -187,7 +196,7 @@
                 tituloGrupo.textContent = grupoData.grupo;
                 results.appendChild(tituloGrupo);
 
-                // Cria os itens das peças
+                // Cria os itens das peças dentro do grupo
                 grupoData.pecas.forEach(peca => {
                     const item = document.createElement('div');
                     item.className = 'peca-item';
@@ -199,10 +208,10 @@
                 });
             });
 
-            // Botão para processar outro manual
+            // Cria o botão de reset para processar outro manual
             const btnVoltar = document.createElement('button');
             btnVoltar.textContent = "Processar novo manual";
-            btnVoltar.style.cssText = "margin-top: 20px; padding: 10px; width: 100%; cursor: pointer; background: #0066b2; color: white; border: none; border-radius: 5px;";
+            btnVoltar.style.cssText = "margin-top: 20px; padding: 10px; width: 100%; cursor: pointer; background: #0066b2; color: white; border: none; border-radius: 5px; font-weight: bold;";
             btnVoltar.onclick = () => location.reload();
             results.appendChild(btnVoltar);
         }
