@@ -22,6 +22,10 @@ export default async function handler(req) {
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+    if (!GEMINI_API_KEY) {
+      throw new Error("Chave da API do Gemini não configurada nas variáveis de ambiente do Vercel.");
+    }
+
     const prompt = `
       Você é um orçamentista técnico da BMW. Leia o manual de reparação abaixo.
       Extraia TODAS as peças de substituição obrigatória, peças recomendadas e fluidos mencionados.
@@ -42,8 +46,8 @@ export default async function handler(req) {
       ${textoManual}
     `;
 
-    // Usando v1beta e o modelo correto do Flash:
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    // Alterado para gemini-1.5-flash-latest para evitar erros de versão do modelo
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
