@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leitor de Manuais AIR - Oficina AI</title>
+    <!-- Importando o leitor de PDF direto no navegador -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
     <style>
         :root {
             --primary: #0066b2; /* Azul estilo BMW */
@@ -112,7 +117,7 @@
 
         <!-- Mensagem de carregando -->
         <div id="loader">
-            ⏳ A IA está lendo o manual e separando as peças. Aguarde...
+            ⏳ Lendo o PDF e enviando para a IA. Aguarde...
         </div>
 
         <!-- Área onde a lista será gerada -->
@@ -125,10 +130,7 @@
         const loader = document.getElementById('loader');
         const results = document.getElementById('results');
 
-        // Clicar na área aciona o input
         dropZone.addEventListener('click', () => fileInput.click());
-
-        // Evento quando o arquivo é selecionado
         fileInput.addEventListener('change', handleFileSelect);
 
         function handleFileSelect(event) {
@@ -140,75 +142,69 @@
             }
         }
 
-        // Função de envio real para o backend
+        // Lê o PDF no navegador e envia apenas o texto para a API do Vercel
         async function processarPDF(file) {
-            // Esconde a área de upload e mostra o loader
             dropZone.style.display = 'none';
             loader.style.display = 'block';
             results.style.display = 'none';
 
-            // Prepara o arquivo para envio via formulário (FormData)
-            const formData = new FormData();
-            formData.append('file', file);
-
             try {
-                // Aponta para a API do Vercel que criamos
-                const URL_DO_SEU_BACKEND = '/api/extrair-pecas';
+                // 1. Extrai o texto do PDF localmente
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdfDoc = await loadingTask.promise;
+                let textoCompleto = "";
 
-                const resposta = await fetch(URL_DO_SEU_BACKEND, {
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    const page = await pdfDoc.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const textItems = textContent.items.map(item => item.str);
+                    textoCompleto += textItems.join(" ") + "\n";
+                }
+
+                // 2. Envia o texto extraído para a API do Vercel via JSON
+                const resposta = await fetch('/api/extrair-pecas', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ textoManual: textoCompleto })
                 });
 
                 if (!resposta.ok) {
                     throw new Error(`Erro na comunicação com o servidor: ${resposta.status}`);
                 }
 
-                // Recebe o JSON real gerado pela IA através do seu backend
                 const dadosJSON = await resposta.json();
-                
-                // Manda o JSON para a função que desenha a tela
                 renderizarResultados(dadosJSON);
 
             } catch (erro) {
                 console.error("Falha ao processar:", erro);
-                alert("Ocorreu um erro ao analisar o manual. Tente novamente ou verifique se o backend está rodando.");
-                
-                // Restaura a tela em caso de erro para permitir nova tentativa
+                alert("Ocorreu um erro ao analisar o manual. Tente novamente.");
                 dropZone.style.display = 'block';
                 loader.style.display = 'none';
             }
         }
 
-        // Função para construir o HTML a partir do JSON recebido
         function renderizarResultados(dados) {
             loader.style.display = 'none';
             results.style.display = 'block';
-            
-            // Limpa resultados anteriores caso existam
             results.innerHTML = '<h3>🔧 Checklist para o Catálogo (ETK)</h3>';
 
-            // Faz o loop pelos grupos do ETK devolvidos pela IA
             dados.forEach(grupoData => {
-                // Cria o título do Grupo
                 const tituloGrupo = document.createElement('div');
                 tituloGrupo.className = 'grupo-titulo';
                 tituloGrupo.textContent = grupoData.grupo;
                 results.appendChild(tituloGrupo);
 
-                // Cria os itens das peças dentro do grupo
                 grupoData.pecas.forEach(peca => {
                     const item = document.createElement('div');
                     item.className = 'peca-item';
-                    
-                    item.innerHTML = `
-                        <div><span class="qtd">${peca.qtd}</span> ${peca.nome}</div>
-                    `;
+                    item.innerHTML = `<div><span class="qtd">${peca.qtd}</span> ${peca.nome}</div>`;
                     results.appendChild(item);
                 });
             });
 
-            // Cria o botão de reset para processar outro manual
             const btnVoltar = document.createElement('button');
             btnVoltar.textContent = "Processar novo manual";
             btnVoltar.style.cssText = "margin-top: 20px; padding: 10px; width: 100%; cursor: pointer; background: #0066b2; color: white; border: none; border-radius: 5px; font-weight: bold;";
